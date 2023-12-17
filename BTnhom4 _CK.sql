@@ -661,17 +661,19 @@ BEGIN
         SUM(CHITIETDATHANG.SOLUONG) AS SoLuongDaBan
     FROM
         MATHANG
-    LEFT JOIN CHITIETDATHANG ON MATHANG.MAHANG = CHITIETDATHANG.MAHANG
+		LEFT JOIN CHITIETDATHANG ON MATHANG.MAHANG = CHITIETDATHANG.MAHANG
     WHERE
         MATHANG.MAHANG = @MaHang
     GROUP BY
         MATHANG.MAHANG, MATHANG.TENHANG, MATHANG.SOLUONG;
 END;
-select * from dbo.CHITIETDATHANG
+select * from dbo.MATHANG
+
 -- check 
-EXEC dbo.pro_ThongKeHang @MaHang = 'MH025';
-
-
+EXEC dbo.pro_ThongKeHang @MaHang = 'MH2005';
+update dbo.CHITIETDATHANG
+SET SOLUONG = 56
+WHERE SOHOADON = 'HD3005' and MAHANG= 'MH2005'
 
 
 --câu 3: Viết hàm trả về một bảng trong đó cho biết tổng số lượng hàng bán được của măt hàng có mã mặt hàng truyền vào làm tham số  
@@ -739,18 +741,20 @@ ON dbo.CHITIETDATHANG
 AFTER INSERT , UPDATE , DELETE
 AS 
 BEGIN 
-	if exists (select * from MATHANG AS MH, inserted AS i where MH.MAHANG = i.MAHANG and MH.SOLUONG <i.SOLUONG)
+	if exists (select * from MATHANG AS MH, inserted AS i 
+	where MH.MAHANG = i.MAHANG and MH.SOLUONG <i.SOLUONG)
 	BEGIN
         PRINT N'Số lượng đặt vượt quá số lượng hàng hiện còn';
         ROLLBACK;
     END
+	save tran sp1
 	If not exists(select * from deleted) 
 	--➔ đã INSERT data
 		UPDATE dbo.MATHANG 
 		SET MATHANG.SOLUONG = MATHANG.SOLUONG - i.SOLUONG 
 		FROM inserted AS i
 		WHERE MATHANG.MAHANG = i.MAHANG
-
+	save tran sp2 
 	If not exists(select * from inserted) 
 	--➔ đã DELETE data
 	-- Khi xoa 1 san pham
@@ -762,19 +766,21 @@ BEGIN
 	Else
 	--➔ có Update data
 		BEGIN
-		if exists (select * from MATHANG AS MH, inserted AS i, deleted AS d where MH.MAHANG = i.MAHANG
+		if exists (select * from MATHANG AS MH, inserted AS i, deleted AS d 
+		where MH.MAHANG = i.MAHANG
 		and i.MAHANG = d.MAHANG and i.SOHOADON = d.SOHOADON
 		and MH.SOLUONG+d.SOLUONG <i.SOLUONG 
 		and MH.SOLUONG +d.SOLUONG-i.SOLUONG>=1)
 			BEGIN
 				PRINT N'Số lượng đặt vượt quá số lượng hàng hiện còn';
-				ROLLBACK;
+				ROLLBACK tran sp1;-- về trí đầu tiên chưa làm gì cả
 			END
 		UPDATE MATHANG
         SET MATHANG.SOLUONG = MATHANG.SOLUONG + d.SOLUONG - i.SOLUONG
         FROM inserted AS i, deleted AS d 
 		WHERE i.MAHANG = d.MAHANG and i.SOHOADON = d.SOHOADON
 	END;
+	-- xong xuôi tất cả 
 	UPDATE dbo.CHITIETDATHANG 
 	SET GIABAN =  MH.GIAHANG
 	FROM dbo.MATHANG AS MH
@@ -782,16 +788,18 @@ BEGIN
 END;
 
 
+-- Test  
+
 INSERT INTO dbo.DONDATHANG(SOHOADON,MAKHACHHANG, MANHANVIEN, NGAYDATHANG, NGAYGIAOHANG, NGAYCHUYENHANG, NOIGIAOHANG)
 VALUES
 		('HD3012','KH01', 'NV01', '2023-01-15', '2023-01-20', '2023-01-21', N'Hải Châu')
-INSERT INTO dbo.CHITIETDATHANG
+INSERT INTO dbo.CHITIETDATHANG 
 VALUES 
 	('HD3011','MH025',NULL,10,default),
 	('HD3001','MH2001',410000,30,default),
 	('HD3002','MH2002',510000,30,default),
 select * from dbo.MATHANG
-select * from dbo.CHITIETDATHANG
+select * from dbo.CHITIETDATHANG WHERE SOHOADON ='HD3011' and MAHANG='MH025'
 
 delete from dbo.CHITIETDATHANG
 WHERE SOHOADON ='HD3011';
@@ -799,3 +807,6 @@ WHERE SOHOADON ='HD3011';
 update dbo.CHITIETDATHANG 
 SET SOLUONG = 30 
 WHERE SOHOADON ='HD3011' and MAHANG ='MH025'
+delete from dbo.CHITIETDATHANG 
+WHERE SOHOADON ='HD3011' and MAHANG ='MH025'
+
