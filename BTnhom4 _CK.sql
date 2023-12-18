@@ -101,8 +101,11 @@ ADD  CONSTRAINT FK_MATHANG_LOAIHANG
 		DEFAULT 1 FOR SOLUONG,
 	CONSTRAINT GIAHANG_Mathang_format
 		CHECK(GIAHANG>=0);
+/*
 ALTER TABLE MATHANG
-DROP CONSTRAINT soLuong_Mathang_format
+ADD	CONSTRAINT soLuong_Mathang_formay
+		CHECK(SOLUONG>=0)
+*/
 CREATE TABLE DONDATHANG(
 	SOHOADON char(10) PRIMARY KEY ,
 	MAKHACHHANG char(10),
@@ -604,7 +607,7 @@ GROUP BY MH.MAHANG, MH.TENHANG;
 -- Hàm thủ tục trigger 
 
 -- Câu 1: 
-CREATE PROCEDURE ThemMatHang
+ALTER PROCEDURE ThemMatHang
     @MaHang char(10),
     @TenHang nvarchar(50),
     @MaCongTy char(10),
@@ -628,10 +631,15 @@ BEGIN
 
     IF @MaLoaiHang IS NOT NULL AND NOT EXISTS (SELECT 1 FROM LOAIHANG WHERE MALOAIHANG = @MaLoaiHang)
     BEGIN
-        PRINT 'Mã loại hàng không hợp lệ.';
+        PRINT N'Mã loại hàng không hợp lệ.';
         RETURN;
     END
 
+	If @SoLuong <0
+		BEGIN 
+			PRINT N'Số lượng hàng không hợp lệ'
+			RETURN;
+		END;
     IF @MaCongTy IS NOT NULL AND NOT EXISTS (SELECT 1 FROM NHACUNGCAP WHERE MACONGTY = @MaCongTy)
     BEGIN
         PRINT N'Mã công ty không hợp lệ.';
@@ -645,15 +653,20 @@ BEGIN
 END
 
 
-EXECUTE ThemMatHang 'MH025', N'Tên hàng mới', 'CT01', 'MH01', 100, N'Cái', 500000;
-
+EXECUTE ThemMatHang 'MH039', N'Tên hàng mới nhất', 'CT01', 'MH01', -5, N'Cái', 500000;
+select * from dbo.MATHANG 
 select * from dbo.NHACUNGCAP
 
 --câu 2: 
-CREATE PROCEDURE dbo.pro_ThongKeHang
+ALTER PROCEDURE dbo.pro_ThongKeHang
     @MaHang CHAR(10)
 AS
 BEGIN
+	IF @MaHang IS NOT NULL AND NOT EXISTS (SELECT 1 FROM MATHANG WHERE MAHANG = @MaHang)
+		BEGIN
+			PRINT N'Mã hàng không hợp lệ.';
+			RETURN;
+		END
     SELECT
         MATHANG.MAHANG,
         MATHANG.TENHANG,
@@ -726,6 +739,7 @@ RETURN
         MATHANG.MAHANG, MATHANG.TENHANG, MATHANG.SOLUONG
 );
 select * from dbo.fn_ThongKeHang();
+
 /*
 4. Viết trigger cho bảng CHITIETDATHANG theo yêu cầu sau :
 			- Khi một bản ghi mới được bổ sung vào bảng ghi này thì giảm số lượng hàng hiện 
@@ -762,7 +776,6 @@ BEGIN
 		SET MATHANG.SOLUONG = MATHANG.SOLUONG + d.SOLUONG 
 		FROM deleted AS d
 		WHERE MATHANG.MAHANG = d.MAHANG
-	
 	Else
 	--➔ có Update data
 		BEGIN
@@ -802,7 +815,7 @@ select * from dbo.MATHANG
 select * from dbo.CHITIETDATHANG WHERE SOHOADON ='HD3011' and MAHANG='MH025'
 
 delete from dbo.CHITIETDATHANG
-WHERE SOHOADON ='HD3011';
+WHERE SOHOADON ='HD3011'and MAHANG='MH025';
 
 update dbo.CHITIETDATHANG 
 SET SOLUONG = 30 
